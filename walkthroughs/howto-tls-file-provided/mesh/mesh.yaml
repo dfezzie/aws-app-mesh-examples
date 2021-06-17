@@ -85,17 +85,20 @@ Resources:
       MeshName: !GetAtt Mesh.MeshName
       VirtualNodeName: ColorTellerWhite
       Spec:
+        Backends:
+          - VirtualService:
+              VirtualServiceName: "www.amazon.com"
+              ClientPolicy:
+                TLS:
+                  Enforce: true
+                  Validation:
+                    Trust:
+                      File:
+                        CertificateChain: '/etc/ssl/certs/ca-bundle.crt'
         Listeners:
           - PortMapping:
               Port: 80
               Protocol: http
-            HealthCheck:
-              Protocol: http
-              Path: /ping
-              HealthyThreshold: 2
-              UnhealthyThreshold: 3
-              TimeoutMillis: 2000
-              IntervalMillis: 5000
             TLS:
               Mode: STRICT
               Certificate:
@@ -171,3 +174,29 @@ Resources:
         Provider:
           VirtualRouter:
             VirtualRouterName: !GetAtt ColorTellerVirtualRouter.VirtualRouterName
+
+
+  AmazonVirtualService:
+    DependsOn: AmazonVirtualNode
+    Type: AWS::AppMesh::VirtualService
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualServiceName: "www.amazon.com"
+      Spec:
+        Provider:
+          VirtualNode:
+            VirtualNodeName: AmazonVirtualNode
+
+  AmazonVirtualNode:
+    Type: AWS::AppMesh::VirtualNode
+    Properties:
+      MeshName: !GetAtt Mesh.MeshName
+      VirtualNodeName: AmazonVirtualNode
+      Spec:
+        Listeners:
+          - PortMapping:
+              Port: 443
+              Protocol: tcp
+        ServiceDiscovery:
+          DNS:
+            Hostname: "www.amazon.com"

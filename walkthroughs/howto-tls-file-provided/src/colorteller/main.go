@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/aws/aws-xray-sdk-go/xray"
 )
@@ -41,12 +43,36 @@ func getStage() string {
 }
 
 type colorHandler struct{}
+
 func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	amznUrl := "http://www.amazon.com:443/robots.txt"
 	log.Println("color requested, responding with", getColor())
-	fmt.Fprint(writer, getColor())
+	tr := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: true,
+	}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Get(amznUrl)
+	if err != nil {
+		log.Print("Some issue calling the amazon api")
+		log.Println(err)
+		fmt.Fprint(writer, err)
+	} else {
+		body, err := ioutil.ReadAll(resp.Body)
+		sb := string(body)
+		if err != nil {
+			fmt.Fprintln(writer, err)
+		} else {
+			log.Print("Successfully called " + amznUrl)
+			log.Print(sb)
+			fmt.Fprint(writer, sb)
+		}
+	}
 }
 
 type pingHandler struct{}
+
 func (h *pingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	log.Println("ping requested, reponding with HTTP 200")
 	writer.WriteHeader(http.StatusOK)
